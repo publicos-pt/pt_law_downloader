@@ -21,8 +21,25 @@ PUBLICATION_URL_FORMAT = 'https://dre.pt/home/-/dre/{publication_id}/details/' \
 # /application/file/137056
 PDF_ID_REGEX = re.compile(r'/application/file/(\d+)')
 
-DOCUMENT_META_REGEX = '(.*) n.º (\d+)/(\d{4})(, .*)?, ' \
-                      'Série (.*) de (\d{4}-\d{2}-\d{2})'
+
+_COMMON = r'(?P<dr_name>Diário da República|Diário do Governo)'\
+          r'(?: n.º )(?P<dr_number>[0-9A-Za-z/-]+)'\
+          r'(?P<dr_supplement>, .*)?, '\
+          r'Série (?P<dr_series>.*) de '\
+          r'(?P<dr_date>\d{4}-\d{2}-\d{2})'
+
+
+DOCUMENT_META_REGEX = re.compile(_COMMON + r'$')
+
+
+NUMBERED_META_RE = re.compile(r'^(?P<pub_type>.*?)'
+                              r'(?: n.º )(?P<pub_number>[0-9A-Za-z/-]+)'
+                              r'(?:\s+-\s+)%s(?P<pub_id>\d+)$' % _COMMON)
+
+# pub_number is never to be matched as it should be None in this situation
+# see how here: http://stackoverflow.com/a/1723225/931303
+UNNUMBERED_META_RE = re.compile(r'^(?P<pub_type>.*?)(?P<pub_number>(?!a)a)?'
+                                r'(?:\s+-\s+)%s(?P<pub_id>\d+)$' % _COMMON)
 
 
 def cache(file_name_format):
@@ -84,27 +101,24 @@ def parse_document_string(string):
     """
     Parses the string identifying the document.
     """
-    regex = re.compile(DOCUMENT_META_REGEX)
-    match = regex.search(string)
+    match = DOCUMENT_META_REGEX.search(string)
 
-    if match.group(4) is not None:
-        sup = match.group(4)[2:]
+    if match.group('dr_supplement') is not None:
+        sup = match.group('dr_supplement')[2:]
     else:
         sup = None
 
-    return {'name': match.group(1),
-            'number': match.group(2),
-            'year': match.group(3),
+    return {'name': match.group('dr_name'),
+            'number': match.group('dr_number'),
             'supplement': sup,
-            'series': match.group(5),
-            'date': match.group(6)}
+            'series': match.group('dr_series'),
+            'date': match.group('dr_date')}
 
 
 def test_parse_document_string1():
     r = parse_document_string('Diário do Governo n.º 4/1975, 1º Suplemento, Série III de 1975-01-06')
     assert(r['name'] == 'Diário do Governo')
-    assert(r['number'] == '4')
-    assert(r['year'] == '1975')
+    assert(r['number'] == '4/1975')
     assert(r['supplement'] == '1º Suplemento')
     assert(r['series'] == 'III')
     assert(r['date'] == '1975-01-06')
@@ -113,10 +127,18 @@ def test_parse_document_string1():
 def test_parse_document_string2():
     r = parse_document_string('Diário da República n.º 291/2000, Apêndice 171/2000, Série II de 2000-12-19')
     assert(r['name'] == 'Diário da República')
-    assert(r['number'] == '291')
-    assert(r['year'] == '2000')
+    assert(r['number'] == '291/2000')
     assert(r['supplement'] == 'Apêndice 171/2000')
     assert(r['series'] == 'II')
+    assert(r['date'] == '2000-12-19')
+
+
+def test_parse_document_string3():
+    r = parse_document_string('Diário da República n.º 291/2000, Série I de 2000-12-19')
+    assert(r['name'] == 'Diário da República')
+    assert(r['number'] == '291/2000')
+    assert(r['supplement'] is None)
+    assert(r['series'] == 'I')
     assert(r['date'] == '2000-12-19')
 
 
@@ -149,12 +171,27 @@ def parse_publication_string(string):
     """
     Parses the publication string into a type, a number and its dre_id.
     """
-    'Portaria n.º 286/2014 - [...][dre_id]'
-    regex = re.compile('(.*) n.º (.*)  - %s(\d+)' % DOCUMENT_META_REGEX)
-    match = regex.search(string)
-    return {'type': match.group(1),
-            'number': match.group(2),
-            'dre_id': int(match.group(9))}
+    match = NUMBERED_META_RE.search(string)
+    if not match:
+        match = UNNUMBERED_META_RE.search(string)
+
+    return {'type': match.group('pub_type'),
+            'number': match.group('pub_number'),
+            'dre_id': int(match.group('pub_id'))}
+
+
+def test_parse_publication_string1():
+    r = parse_publication_string('Portaria n.º 5/75  - Diário do Governo n.º 1/1975, Série I de 1975-01-02300809')
+    assert(r['type'] == 'Portaria')
+    assert(r['number'] == '5/75')
+    assert(r['dre_id'] == 300809)
+
+
+def test_parse_publication_string2():
+    r = parse_publication_string('Despacho  - Diário do Governo n.º 1/1975, Série I de 1975-01-02300805')
+    assert(r['type'] == 'Despacho')
+    assert(r['number'] is None)
+    assert(r['dre_id'] == 300805)
 
 
 def parse_publication_html(publication_id):
@@ -174,8 +211,11 @@ def parse_publication_html(publication_id):
     li = meta_data_div.find('li', class_='tipoDiploma.tipo')
     data['type'] = li.text.split(':')[1]
 
-    li = meta_data_div.find('li', class_='numero')
-    data['number'] = li.text.split(':')[1]
+    try:
+        li = meta_data_div.find('li', class_='numero')
+        data['number'] = li.text.split(':')[1]
+    except AttributeError:
+        data['number'] = None
 
     li = meta_data_div.find('li', class_='emissor.designacao')
     data['creator'] = li.text.split(':')[1]
@@ -247,6 +287,9 @@ if __name__ == '__main__':
 
     test_parse_document_string1()
     test_parse_document_string2()
+    test_parse_document_string3()
+    test_parse_publication_string1()
+    test_parse_publication_string2()
     #test_get_publications_pagination()
 
-    get_documents('I', 2000)
+    get_documents('I', 1975)
