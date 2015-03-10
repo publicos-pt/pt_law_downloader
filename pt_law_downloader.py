@@ -154,7 +154,6 @@ def get_documents(series, year):
 
     results = reversed(soup.find_all('div', class_='result'))
 
-    documents = []
     for result in results:
         data = parse_document_string(result.a.string)
         dre_id = int(re.search('asearch/(\d+)/details', result.a['href']).group(1))
@@ -162,9 +161,7 @@ def get_documents(series, year):
         logger.debug('Getting document_id %d' % dre_id)
 
         data['publications'] = get_publications(dre_id)
-        documents.append(data)
-
-    return documents
+        yield data
 
 
 def parse_publication_string(string):
@@ -292,4 +289,4 @@ if __name__ == '__main__':
     test_parse_publication_string2()
     #test_get_publications_pagination()
 
-    get_documents('I', 1975)
+    list(get_documents('I', 1975))
