@@ -254,6 +254,14 @@ def get_publications(document_id):
     def _get_publications(u_list):
         publications = []
         for result in reversed(u_list.find_all('li')):
+            if not result.find('a'):
+                # publication has no id or any information. Just add an empty
+                # identifying a missing publication of this document.
+                data = {'dre_id': None,
+                        'number': None,
+                        'type': None}
+                publications.append(data)
+                continue
             data = parse_publication_string(result.a.get_text())
             dre_id = data['dre_id']
             logger.debug('Getting publication_id %d' % dre_id)
