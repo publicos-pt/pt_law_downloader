@@ -206,19 +206,28 @@ def parse_publication_html(publication_id):
     data['date'] = datetime.datetime.strptime(date_string, '%Y-%m-%d').date()
 
     li = meta_data_div.find('li', class_='tipoDiploma.tipo')
-    data['type'] = li.text.split(':')[1]
+    if li is None:
+        data['type'] = None
+    else:
+        data['type'] = li.text.split(':')[1]
 
-    try:
-        li = meta_data_div.find('li', class_='numero')
-        data['number'] = li.text.split(':')[1]
-    except AttributeError:
+    li = meta_data_div.find('li', class_='numero')
+    if li is None:
         data['number'] = None
+    else:
+        data['number'] = li.text.split(':')[1]
 
     li = meta_data_div.find('li', class_='emissor.designacao')
-    data['creator'] = li.text.split(':')[1]
+    if li is None:
+        data['creator'] = None
+    else:
+        data['creator'] = li.text.split(':')[1]
 
     li = meta_data_div.find('li', class_='paginas')
-    data['pages'] = li.text.split(':')[1]
+    if li is None:
+        data['pages'] = None
+    else:
+        data['pages'] = li.text.split(':')[1]
 
     li = soup.find('li', class_='formatedSumarioWithLinks')
     if li is None:
