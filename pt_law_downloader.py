@@ -224,7 +224,10 @@ def parse_publication_html(publication_id):
     data['summary'] = li.text.split(':')[1]
 
     li = soup.find('li', class_='formatedTextoWithLinks')
-    data['text'] = str(li.div).replace('<div>', '').replace('</div>', '')
+    if li is None:
+        data['text'] = None
+    else:
+        data['text'] = str(li.div).replace('<div>', '').replace('</div>', '')
 
     return data
 
