@@ -278,6 +278,8 @@ def get_publications(document_id):
     soup = BeautifulSoup(html)
 
     div_list = soup.find('div', class_='list')
+    if div_list is None:
+        return []
 
     publications = _get_publications(div_list.find('ul', recursive=False))
 
@@ -289,7 +291,9 @@ def get_publications(document_id):
             html = get_document_html(document_id, page)
             soup = BeautifulSoup(html)
             div_list = soup.find('div', class_='list')
-            publications += _get_publications(div_list.find('ul', recursive=False))
+            if div_list is not None:
+                publications += _get_publications(
+                    div_list.find('ul', recursive=False))
 
     return publications
 
