@@ -20,9 +20,10 @@ Run the tests with:
 
 ## Usage
 
-The API consists of three functions, that return meta-data an text of a given 
-document or publication as a Python dictionary:
+The API consists of 4 functions that return meta-data an text of a given document
+or publication as a Python dictionary:
 
+* `get_publication(publication_id)`: returns the publication_id
 * `get_publications(document_id)`: returns the list of publications of a document_id.
 * `get_document(document_id)`: returns a single dictionary with a document_id;
 * `get_documents(series, year)`: returns a list of dictionaries, each entry a 

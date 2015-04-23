@@ -150,7 +150,7 @@ def parse_publication_string(string):
             'dre_id': int(match.group('pub_id'))}
 
 
-def parse_publication_html(publication_id):
+def get_publication(publication_id):
     """
     Parses the html of a publication into a dictionary.
     """
@@ -227,7 +227,7 @@ def get_publications(document_id):
 
             data['pdf_id'] = int(PDF_ID_REGEX.search(result.a['href']).group(1))
 
-            data.update(parse_publication_html(data['dre_id']))
+            data.update(get_publication(data['dre_id']))
 
             publications.append(data)
 
