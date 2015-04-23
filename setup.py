@@ -14,4 +14,5 @@ setup(name='pt-law-downloader',
           'Programming Language :: Python',
           'Topic :: Software Development :: Libraries :: Python Modules',
       ],
+      install_requires=['Beautifulsoup4']
 )

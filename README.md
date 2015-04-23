@@ -12,14 +12,18 @@ The authors of this package are Jorge C. Leitão and Helder Guerreiro.
 This package is written in Python 2+3, depends on beautifulSoup 4
 (`pip install beautifulsoup4`), and is licenced under MIT licence (see LICENCE).
 
+## To run the tests
+
+Run the tests with:
+
+    python -m unittest tests
+
 ## Usage
 
-Create a directory `cached_html/` and run
+The API consists of three functions, that return meta-data an text of a given 
+document or publication as a Python dictionary:
 
-`python -m downloader`
-
-The API consists of three functions:
-
-* `get_documents(series, year)`
-* `get_document(document_id)`
-* `get_publications(document_id)`
+* `get_publications(document_id)`: returns the list of publications of a document_id.
+* `get_document(document_id)`: returns a single dictionary with a document_id;
+* `get_documents(series, year)`: returns a list of dictionaries, each entry a 
+  document_id with respective publications.
