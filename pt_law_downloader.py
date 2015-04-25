@@ -156,7 +156,7 @@ def get_publication(publication_id):
     """
     html = get_publication_html(publication_id)
     soup = BeautifulSoup(html)
-    data = {}
+    data = {'dre_id': publication_id}
 
     meta_data_div = soup.find('div', class_='main-details')
 
