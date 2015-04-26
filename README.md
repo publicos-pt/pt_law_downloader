@@ -5,7 +5,7 @@ of the Portuguese law.
 
 ## Author
 
-The authors of this package are Jorge C. Leitão and Helder Guerreiro.  
+The authors of this package are Jorge C. Leitão and Helder Guerreiro.
 
 ## The code
 
@@ -16,15 +16,15 @@ This package is written in Python 2+3, depends on beautifulSoup 4
 
 Run the tests with:
 
-    python -m unittest tests
+    python -m unittest test
 
 ## Usage
 
-The API consists of 4 functions that return meta-data an text of a given document
+The API consists of 4 functions that return meta-data and text of a given document
 or publication as a Python dictionary:
 
-* `get_publication(publication_id)`: returns the publication_id
-* `get_publications(document_id)`: returns the list of publications of a document_id.
-* `get_document(document_id)`: returns a single dictionary with a document_id;
+* `get_publication(publication_id)`: returns the publication `publication_id`
+* `get_publications(document_id)`: returns the list of publications of a `document_id`.
+* `get_document(document_id)`: returns a single dictionary with a `document_id`;
 * `get_documents(series, year)`: returns a list of dictionaries, each entry a 
-  document_id with respective publications.
+  `document_id` with respective publications.
