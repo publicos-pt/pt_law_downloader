@@ -1,8 +1,7 @@
-# encoding: utf-8
 from distutils.core import setup
 
 setup(name='pt-law-downloader',
-      version='0.1',
+      version='1.0.0',
       description='Downloader of the official texts of the portuguese law.',
       long_description=open('README.md').read(),
       author='Jorge C. Leitão',
@@ -11,8 +10,7 @@ setup(name='pt-law-downloader',
       classifiers=[
           'Intended Audience :: Developers',
           'License :: OSI Approved :: MIT License',
-          'Programming Language :: Python',
+          'Programming Language :: Python :: 3',
           'Topic :: Software Development :: Libraries :: Python Modules',
       ],
-      install_requires=['Beautifulsoup4']
-)
+      install_requires=['Beautifulsoup4'])

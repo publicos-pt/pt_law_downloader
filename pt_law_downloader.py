@@ -1,13 +1,7 @@
 import re
 import logging
 import datetime
-
-try:
-    # Python 3
-    from urllib.request import URLopener, urlopen
-except ImportError:
-    # Python 2
-    from urllib import URLopener, urlopen
+from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
 
@@ -18,28 +12,19 @@ URI = 'https://dre.pt/web/guest/pesquisa-avancada/-/asearch/'
 DOCUMENT_ID_FORMAT = URI + '{document_id}' + '/details/{page}/maximized'
 PUBLICATION_URL_FORMAT = 'https://dre.pt/home/-/dre/{publication_id}/details/' \
                          'maximized?serie=II&parte_filter=31'
-# /application/file/137056
-PDF_ID_REGEX = re.compile(r'/application/file/(\d+)')
+# e.g. /application/file/a/137056
+PDF_ID_REGEX = re.compile(r'/application/file/a/(\d+)')
 
 
-_COMMON = r'(?P<dr_name>Diário da República|Diário do Governo)'\
-          r'(?: n.º )(?P<dr_number>[0-9A-Za-z/-]+)'\
-          r'(?P<dr_supplement>, .*)?, '\
-          r'Série (?P<dr_series>.*) de '\
-          r'(?P<dr_date>\d{4}-\d{2}-\d{2})'
+DOCUMENT_META_REGEX = re.compile(
+    r'(?P<dr_name>Diário da República|Diário do Governo)'
+    r'(?: n.º )(?P<dr_number>[0-9A-Za-z/-]+)'
+    r'(?P<dr_supplement>, .*)?, '
+    r'Série (?P<dr_series>.*) de '
+    r'(?P<dr_date>\d{4}-\d{2}-\d{2})$')
 
-
-DOCUMENT_META_REGEX = re.compile(_COMMON + r'$')
-
-
-NUMBERED_META_RE = re.compile(r'^(?P<pub_type>.*?)'
-                              r'(?: n.º )(?P<pub_number>[0-9A-Za-z/-]+)'
-                              r'(?:\s+-\s+)%s(?P<pub_id>\d+)$' % _COMMON)
-
-# pub_number is never to be matched as it should be None in this situation
-# see how here: http://stackoverflow.com/a/1723225/931303
-UNNUMBERED_META_RE = re.compile(r'^(?P<pub_type>.*?)(?P<pub_number>(?!a)a)?'
-                                r'(?:\s+-\s+)%s(?P<pub_id>\d+)$' % _COMMON)
+PUBLICATION_META_RE = re.compile('^(?P<type>.*?)(?:'
+                                 '(?: n.º )(?P<number>[0-9A-Za-z/-]+))?\s?$')
 
 
 def cache(file_name_format):
@@ -115,6 +100,20 @@ def parse_document_string(string):
             'date': match.group('dr_date')}
 
 
+def get_document(document_id):
+    logger.debug('Getting document_id %d' % document_id)
+
+    html = get_document_html(document_id, 1)
+    soup = BeautifulSoup(html)
+
+    data = parse_document_string(soup.find('h1').string)
+    data['dre_id'] = document_id
+
+    data['publications'] = get_publications(document_id, soup)
+
+    return data
+
+
 def get_documents(series, year):
     """
     Returns a list of all documents of a given series and year as a dictionary.
@@ -125,38 +124,25 @@ def get_documents(series, year):
     html = get_search_html(series, year)
     soup = BeautifulSoup(html)
 
-    results = reversed(soup.find_all('div', class_='result'))
-
-    for result in results:
-        data = parse_document_string(result.a.string)
-        dre_id = int(re.search('asearch/(\d+)/details', result.a['href']).group(1))
-        data['dre_id'] = dre_id
-        logger.debug('Getting document_id %d' % dre_id)
-
-        data['publications'] = get_publications(dre_id)
-        yield data
-
-
-def parse_publication_string(string):
-    """
-    Parses the publication string into a type, a number and its dre_id.
-    """
-    match = NUMBERED_META_RE.search(string)
-    if not match:
-        match = UNNUMBERED_META_RE.search(string)
-
-    return {'type': match.group('pub_type'),
-            'number': match.group('pub_number'),
-            'dre_id': int(match.group('pub_id'))}
+    for entry in reversed(soup.find_all('div', class_='result')):
+        dre_id = int(re.search('asearch/(\d+)/details', entry.a['href']).group(1))
+        yield get_document(dre_id)
 
 
 def get_publication(publication_id):
     """
-    Parses the html of a publication into a dictionary.
+    Gets and parses the html of a publication_id into a dictionary.
     """
+    logger.debug('Getting publication_id %d' % publication_id)
     html = get_publication_html(publication_id)
     soup = BeautifulSoup(html)
-    data = {'dre_id': publication_id}
+
+    match = PUBLICATION_META_RE.search(soup.find('h1').string)
+    data = match.groupdict()
+    data['dre_id'] = publication_id
+
+    a = soup.find('a', class_='download-file')
+    data['pdf_id'] = int(PDF_ID_REGEX.search(a['href']).group(1))
 
     meta_data_div = soup.find('div', class_='main-details')
 
@@ -165,16 +151,11 @@ def get_publication(publication_id):
     data['date'] = datetime.datetime.strptime(date_string, '%Y-%m-%d').date()
 
     li = meta_data_div.find('li', class_='tipoDiploma.tipo')
-    if li is None:
-        data['type'] = None
-    else:
-        data['type'] = li.text.split(':')[1]
+    assert(li.text.split(':')[1] == data['type'])
 
     li = meta_data_div.find('li', class_='numero')
-    if li is None:
-        data['number'] = None
-    else:
-        data['number'] = li.text.split(':')[1]
+    if data['number']:
+        assert(li.text.split(':')[1] == data['number'])
 
     li = meta_data_div.find('li', class_='emissor.designacao')
     if li is None:
@@ -203,15 +184,18 @@ def get_publication(publication_id):
     return data
 
 
-def get_publications(document_id):
+def get_publications(document_id, soup=None):
     """
     Given a document id, returns the list of all publications on it.
 
     This does at least 1 hit in DRE. If the document has more than 20
     publications, it performs #publications//20 hits (1 hit/page of 20 results).
+
+    If soup is not None, it does -1 hit since it uses the soup to extract the list
+    of publications.
     """
     def _get_publications(u_list):
-        publications = []
+        pubs = []
         for result in reversed(u_list.find_all('li')):
             if not result.find('a'):
                 # publication has no id or any information. Just add an empty
@@ -219,22 +203,16 @@ def get_publications(document_id):
                 data = {'dre_id': None,
                         'number': None,
                         'type': None}
-                publications.append(data)
+                pubs.append(data)
                 continue
-            data = parse_publication_string(result.a.get_text())
-            dre_id = data['dre_id']
-            logger.debug('Getting publication_id %d' % dre_id)
+            dre_id = int(result.a.find('span', class_='rgba').string)
+            pubs.append(get_publication(dre_id))
 
-            data['pdf_id'] = int(PDF_ID_REGEX.search(result.a['href']).group(1))
+        return pubs
 
-            data.update(get_publication(data['dre_id']))
-
-            publications.append(data)
-
-        return publications
-
-    html = get_document_html(document_id, 1)
-    soup = BeautifulSoup(html)
+    if soup is None:
+        html = get_document_html(document_id, 1)
+        soup = BeautifulSoup(html)
 
     div_list = soup.find('div', class_='list')
     if div_list is None:
