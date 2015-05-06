@@ -108,3 +108,23 @@ class TestDownloader(unittest.TestCase):
         del pubs[0]['summary']
 
         self.assertEqual(expected, pubs[0])
+
+    def test_638275(self):
+        """
+        This publication has a problem on its number: it is
+        `4/93, de 13 de Setembro` instead of `4/93`. We have changed the code
+        to account for this special case, and thus have a test for it.
+        """
+        result = get_publication(638275)
+
+        del result['summary']
+        del result['text']
+
+        expected = {'dre_id': 638275,
+                    'date': datetime.date(1993, 9, 13),
+                    'type': 'Decreto do Ministro da República',
+                    'number': '4/93',
+                    'creator': 'Gabinete do Ministro da República para a Região Autónoma dos Açores',
+                    'pages': '4920-(2) a  4920-(2)',
+                    'pdf_id': 638180}
+        self.assertEqual(expected, result)
